@@ -1,20 +1,62 @@
-import React, { useState } from "react";
+import axios from "axios";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
+import { useGoogleLogin } from "@react-oauth/google";
+import toast from "react-hot-toast";
+
+import { authService } from "../main";
+import { useAppData } from "../context/AppContext";
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleGoogleLogin = () => {
+  const { setUser, setIsAuth } = useAppData();
+
+  // Handle Google login response
+  const responseGoogle = async (authResult) => {
     setLoading(true);
 
-    // Add Google authentication here
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const result = await axios.post(
+        `${authService}/api/auth/login`,
+        {
+          code: authResult.code,
+        }
+      );
+
+      // Save JWT token
+      localStorage.setItem("token", result.data.token);
+
+      // Update global auth state
+      setUser(result.data.user);
+      setIsAuth(true);
+
+      toast.success(result.data.message);
+
+      // Go to home page
       navigate("/");
-    }, 1000);
+    } catch (error) {
+      console.error("Google Login Error:", error);
+
+      toast.error(
+        error?.response?.data?.message || "Problem while login"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Google OAuth
+  const googleLogin = useGoogleLogin({
+    onSuccess: responseGoogle,
+    onError: () => {
+      setLoading(false);
+      toast.error("Google login failed");
+    },
+    flow: "auth-code",
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-orange-50 flex items-center justify-center px-4 py-8">
@@ -35,7 +77,9 @@ const Login = () => {
           <div className="text-center">
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">
               Welcome to{" "}
-              <span className="text-[#E23774]">Bitezy</span>
+              <span className="text-[#E23774]">
+                Bitezy
+              </span>
             </h1>
 
             <p className="mt-2 text-sm text-gray-500">
@@ -46,8 +90,9 @@ const Login = () => {
           {/* Login Section */}
           <div className="mt-8">
 
+            {/* Google Login */}
             <button
-              onClick={handleGoogleLogin}
+              onClick={() => googleLogin()}
               disabled={loading}
               className="group flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -56,7 +101,9 @@ const Login = () => {
                 className="transition-transform duration-200 group-hover:scale-110"
               />
 
-              {loading ? "Signing in..." : "Continue with Google"}
+              {loading
+                ? "Signing in..."
+                : "Continue with Google"}
             </button>
 
             {/* Divider */}
@@ -83,10 +130,13 @@ const Login = () => {
           {/* Terms */}
           <p className="mt-7 text-center text-xs leading-5 text-gray-400">
             By continuing, you agree to our{" "}
+
             <button className="font-medium text-[#E23774] hover:underline">
               Terms of Service
             </button>{" "}
+
             and{" "}
+
             <button className="font-medium text-[#E23774] hover:underline">
               Privacy Policy
             </button>
